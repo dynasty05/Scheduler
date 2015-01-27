@@ -1,0 +1,112 @@
+MAIN TASK
+> Basic classes required: Message, Gateway, MessageHandler/Scheduler.
+
+> I define these as interfaces, so I can define classes with their own 
+implementations of the identified methods.
+ 
+> For Message I need:
+	- group id is needed at instantiation
+	- completed() method for when processing has been completed. (stated in problem)
+	
+> For Gateway, I need:
+	- send(). (stated in problem)
+	- isAvailable: to tell whether the Gateway is available
+	
+> For MessageHandler, I need:
+	- sendMessages(List<Message> messages): to send messages that need to be 
+	processed.
+
+	- addProcessedMessage(Message message): to return a processed message to 
+	the message handler
+	
+	- getProcessedMessages (): to retrieve the processed messages from the 
+	message handler.	
+	
+> Message implementations:
+	- I define class MessageImpl for a basic message belonging to a group (an 
+	integer greater than or equal to zero).
+	- I define class TerminationMessage as a subclass of MessageImpl so as to 
+	inherit behaviours/methods and properties.	
+	
+> MessageHandler implementation (MessageHandlerImpl):
+	- I define class MessageHandlerImpl, override 
+	sendMessages(List<Message> messages) to implement the stated set of 
+	behaviours.
+	
+	- MessageHandlerImpl needs the number of resources to use at instantiation:
+	MessageHandlerImpl (int numberOfGateways). I need to create Gateway 
+	instances when the MessageHandlerImpl is instantiated. 
+	
+	- Method sendMessages(List<Message> messages) takes a list of unprocessed 
+	messages and queues them. Based on the number of configured resources, it
+	sends messages to available resources based on order of arrival of groups.
+	
+	- The algorithm to select the correct message gets complicated within this 
+	method, so I define an interface, MessageSelector to deal with selecting 
+	each successive eligible message.
+	
+	- I define interface, MessageSelector, with method 
+	selectNextMessage(List<Message> messageQueue), which takes the current 
+	message queue and returns the next 'correct' message. If there are no 
+	more eligible messages, this method would return a null to indicate the 
+	end of processing.
+	
+	- Since there may be more than one resource configured, and to prevent 
+	waiting unnecessary, I need to make sure each message is sent to an 
+	available gateway for processing in its own thread. This requires making 
+	Gateway implementations implement interface Runnable.
+	
+	- For each processing thread that is started, I need to wait for the 
+	message to be processed before continuing the main thread to prevent the 
+	main thread completing before the processing threads. For this, I need to 
+	synchronize/wait on the selected message object.
+
+> Gateway implementation, GatewayImpl:
+	- Implements both Gateway and Runnable interfaces, since the processing of 
+	the message will be in its own thread.
+	- I implement Runnable method run, to process the message (I simply, mark 
+	the message as processed for simplicity). I also flip the available flag 
+	on the Gateway to indicate the availability of the instance before and 
+	after the processing completes.
+
+EXTRA CREDIT
+> Cancellation of groups:
+	-  I define a class that I call, MessageHandlerCancelledGroupsAware as a 
+	subclass of MessageHandlerImpl so that it can inherit its protected 
+	behaviours and fields, while I define additional method, 
+	cancelGroup(int groupId) to indicate the group that should be cancelled.
+	
+	- I also override sendMessages(List<Message> messages), to use a new 
+	implementation of MessageSelector I defined, called 
+	MessageSelectorCancelledGroupsAware to select eligible messages in a manner 
+	that acknowledges cancelled groups.
+	
+	-  MessageSelector implementation MessageSelectorCancelledGroupsAware:
+	I define this class to deal with selecting eligible messages based on the 
+	stated prioritisation algorithm, and also based on whether the group of the 
+	message has been cancelled by implementing 
+	selectNextMessage(List<Message> messageQueue). If there are no further 
+	eligible messages, this method returns null to indicate there are no more 
+	messages to process.
+	
+	  
+> Termination Messages:
+	- I define a stand alone class, MessageHandlerTerminationMessageAware to 
+	handle the scheduling of messages that can include termination messages. I 
+	decided to declare it stand alone, as against an implementation of 
+	MessageHandler, because its sendMessages(List<Message> messages) method 
+	can throw a checked exception, which would violate the MessageHandler 
+	contract.
+	
+	- I also define a stand alone MessageSelector, 
+	MessageSelectorTerminationMessageAware (for the above reason) to handle 
+	the selection of next eligible messages. 
+	
+	- Once MessageSelectorTerminationMessageAware has returned a 
+	TerminationMessage for a group, if it finds another message in that same 
+	group, it throws a 
+	TerminationMessageProcessedException to signal this error.
+	
+UNIT TESTS
+> I have written unit tests to test different 
+scenarios for each accessible method of the classes I have built.  	
